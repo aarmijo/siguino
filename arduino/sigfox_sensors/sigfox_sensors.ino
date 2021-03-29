@@ -313,7 +313,7 @@ void loop() {
     hexString += stringHEX(presion_media, 4); // presion_media -- 2 bytes (4 hex chars)
     hexString += stringHEX(humedad_media, 4); // humedad_media -- 2 bytes (4 hex chars)
         
-    String msg_header = "Packed bits (HEX): ";
+    String msg_header = "Sigfox message (HEX): ";
     Util::debug_print(msg_header + hexString);
 
     if (SEND_SIGFOX_MESSAGES) {
