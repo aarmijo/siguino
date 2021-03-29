@@ -15,10 +15,10 @@ Adafruit_BME280 bme; // I2C
 //Adafruit_BMP280 bmp(BMP_CS); // hardware SPI
 //Adafruit_BMP280 bmp(BMP_CS, BMP_MOSI, BMP_MISO,  BMP_SCK);
 
-const byte BME_ADDRESS   =  0x76;
+const byte BME_ADDRESS = 0x76;
 
 //set to false for debug and to avoid sending messages but still take sensor readings
-bool SEND_SIGFOX_MESSAGES = false;
+bool SEND_SIGFOX_MESSAGES = true;
 
 //declare LIS3DH accelerometer
 LIS3DH myIMU(SPI_MODE, 10); // constructed with parameters for SPI and cs pin number
@@ -191,48 +191,6 @@ int get_light_reading() {
   return light_value;
 }
 
-// unsigned int vals[] = {seq_num, rounded_temp, avg_light, shock_occurred, mag_occurred, batt_lvl,rounded_pressure,rounded_hum,rounded_alt};
-void print_sensor_data(unsigned int vals[]) {
-  Serial.print(F("Seq num: "));
-  Serial.println(vals[0]);
-  Serial.println(F("---Seq--|M|S|--Light--|--Temp-|Batt|Pressure|Humidity|Altitude"));
-  String hex_bits = String(vals[0], BIN);
-  int len = strlen(hex_bits.c_str());
-  for (int i = 0; i < 8 - len; i++) {
-    Serial.print(" ");
-  }
-  Serial.print(String(vals[0], BIN));
-  Serial.print(F("|"));
-  Serial.print(vals[4]);
-  Serial.print(F("|"));
-  Serial.print(vals[3]);
-  Serial.print(F("|"));
-  Serial.print(vals[2]);
-  Serial.print(F("|"));
-  Serial.print(vals[1]);
-  Serial.print(F("|"));
-  Serial.print(vals[5]);
-  Serial.print(F("|"));
-  Serial.print(vals[6]);
-  Serial.print(F("|"));
-  Serial.print(vals[7]);
-  Serial.print(F("|"));
-  Serial.println(vals[8]);
-
-}
-
-String uint64_to_hexstr(uint64_t int64bits) {
-  String hex_chars = "0123456789ABCDEF";
-  String hexstr = "";
-  int ndx;
-  for (int i = 0; i < 16; i++) {
-    ndx = int(int64bits & B1111);
-    int64bits = int64bits >> 4;
-    hexstr = hex_chars.substring(ndx, ndx + 1) + hexstr;
-  }
-  return hexstr;
-}
-
 String stringHEX(unsigned long data, unsigned char numChars) {
   unsigned long mask  = 0x0000000F;
   mask = mask << 4 * (numChars - 1);
@@ -248,8 +206,6 @@ String stringHEX(unsigned long data, unsigned char numChars) {
 
 //main program loop
 void loop() {
-
-
 
   float f = 0;
   unsigned int ui = 0;
@@ -275,39 +231,28 @@ void loop() {
     // get temp
     Util::debug_print("Getting sensor information...");
     f = get_temperature_reading();
-    Util::debug_print("Temp (C): ", (int)f, true);
-
-
-    // Lectura de temperatura inicial
-    Serial.print("Temperatura inicial: ");
-    Serial.println(f);
-    uint16_t temper_por_cien = Util::round_float(f * 100);
-    Serial.print("Temperatura inicial por cien en HEX: ");
-    String temper_hex = String(temper_por_cien, HEX);
-    Serial.println(temper_hex);
-    Serial.print("Temperatura inicial por cien en HEX: ");
-    Serial.println(stringHEX(temper_por_cien, 4));
-
+    // Lectura de temperatura
+    Util::debug_print("Temperatura (ºC): " + String(f));
     total_temp += f;
 
     // get light level
     int light_reading = get_light_reading();
-    Util::debug_print("Light: ", light_reading, true);
+    Util::debug_print("Luz: " + String(light_reading));
     total_light += light_reading;
 
     //get pressure
     f = bme.readPressure() / 100.0F;
-    Util::debug_print("Pressure (hPa): ", (int)f, true);
+    Util::debug_print("Presión (mbar): " + String(f));
     total_pressure += f;
 
     //get altitude
     f = bme.readAltitude(SEALEVELPRESSURE_HPA);
-    Util::debug_print("Altituide (m): ", (int)f, true);
+    Util::debug_print("Altitud (m): " + String(f));
     total_altitude += f;
 
     //get humidity
     f = bme.readHumidity();
-    Util::debug_print("Humidity (%): ", (int)f, true);
+    Util::debug_print("Humedad (%): " + String(f));
     total_humidity += f;
 
     num_readings++;
@@ -317,75 +262,66 @@ void loop() {
     //only send data over sigfox every SIGFOX_WAIT_PERIODS (e.g. 8 = 8x8 seconds, ~ every minute)
     Util::debug_print(F("Sending period has occurred..."));
     Util::debug_print(F("Set sigfox wake up..."));
-    unsigned int vals[] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
     SigFox::set_sigfox_sleep(false);
 
-    vals[0] = seq_num;
-    //float avg_temp = total_temp / num_readings;
+    // secuencia
+    uint8_t secuencia = seq_num;
+    Util::debug_print("Mensaje Sigfox - Secuencia: " + String(secuencia));
+
+    // temperatura_media * 100
+    ui = Util::round_float((total_temp / num_readings) * 100);
+    uint16_t temperatura_media = ui;
+    Util::debug_print("Mensaje Sigfox - Temperatura media * 100: " + String(temperatura_media));
+
+    // luz_media
     ui = total_light / num_readings;
-    Util::debug_print("Avg light level: ", ui, true);
-    //  String light_bin = String(ui, BIN);
-    vals[2] = ui;
+    uint16_t luz_media = ui;
+    Util::debug_print("Mensaje Sigfox - Nivel medio de luz: " + String(luz_media));
 
-    ui = Util::round_float((total_temp / num_readings) * 2);
-    Util::debug_print("Avg Temp (x2, Rounded): ", ui, true);
-    //  String temp_bin = String(ui, BIN);
-    vals[1] = ui;
-
-    ui = min(Util::round_float(total_pressure / num_readings) - MIN_PRESSURE, MAX_PRESSURE);
-    Util::debug_print("total_pressure: ", total_pressure, true);
-    Util::debug_print("rounded_pressure: ", ui, true);
-    //String pressure_bin = String(ui, BIN);
-    vals[6] = ui;
-
-    ui = Util::round_float(total_humidity / num_readings);
-    Util::debug_print("total_humidity: ", total_humidity, true);
-    Util::debug_print("rounded_hum: ", ui, true);
-    //String hum_bin = String(ui, BIN);
-    vals[7] = ui;
-
-    ui = min(Util::round_float((total_altitude / num_readings) / 10) - MIN_ALTITUDE, MAX_ALTITUDE);
-    Util::debug_print("rounded_alt: ", ui, true);
-    Util::debug_print("total_altitude: ", total_altitude, true);
-    //String alt_bin = String(ui, BIN);
-    vals[8] = ui;
     //check if shock interrupt has occurred and re-attach interrupts as necessary
+    uint8_t choque_ocurrido = check_shock_occurred();
+    Util::debug_print("Mensaje Sigfox - Choque ocurrido: " + String(choque_ocurrido));
+    uint8_t mag_ocurrido = check_mag_occurred();
+    Util::debug_print("Mensaje Sigfox - Mag ocurrido: " + String(mag_ocurrido));
 
-    vals[3] = check_shock_occurred();
-    vals[4] = check_mag_occurred();
-
-    //  int curr_vcc = Util::readVcc();
-    // Util::debug_print("Vcc = ", curr_vcc, true);
-
+    // nivel_bateria
     ui = (Util::readVcc() / 100) - MIN_BATT_LVL;
-    Util::debug_print("Batt lvl = ", ui, true);
-    vals[5] = ui;
+    uint16_t nivel_bateria = ui;
+    Util::debug_print("Mensaje Sigfox - Nivel medio de batería: " + String(nivel_bateria));
 
-    //String batt_lvl_bin = String(ui, BIN);
+    // presion_media
+    ui = Util::round_float(total_pressure / num_readings);
+    uint16_t presion_media = ui;
+    Util::debug_print("Mensaje Sigfox - Presión media: " + String(presion_media));
 
-    //unsigned int vals[] = {seq_num, rounded_temp, avg_light, check_shock_occurred(), check_mag_occurred(), batt_lvl,rounded_pressure,rounded_hum,rounded_alt};
-    unsigned int bits[] = {8, 7, 10, 1, 1, 4, 8, 7, 9};
+    // humedad_media * 100
+    ui = Util::round_float((total_humidity / num_readings) * 100);
+    uint16_t humedad_media = ui;
+    Util::debug_print("Mensaje Sigfox - Humedad media * 100: " + String(humedad_media));
 
-    if (DEBUG_MODE) {
-      print_sensor_data(vals);
-    }
+    // altitud_media
+    ui = min(Util::round_float((total_altitude / num_readings) / 10) - MIN_ALTITUDE, MAX_ALTITUDE);
+    uint8_t altitud_media = ui;
+    Util::debug_print("Mensaje Sigfox - Altitud media: " + String(altitud_media));
 
-    uint64_t packed = BitPacker::get_packed_message_64(vals, bits, 9);
-    String hex_bits = uint64_to_hexstr(packed);
-
-    //String hex_bits = String(packed, HEX);
-    //if (strlen(hex_bits.c_str())%2==1){
-    //  hex_bits = "0" + hex_bits;
-    //}
+    // Sigfox message of maximum 12 bytes
+    String hexString = stringHEX(temperatura_media, 4); // temperatura_media -- 2 bytes (4 hex chars)
+    hexString += stringHEX(luz_media, 4); // luz_media -- 2 bytes (4 hex chars)
+    hexString += stringHEX(choque_ocurrido, 2); // choque_ocurrido -- 1 byte (2 hex chars)
+    hexString += stringHEX(mag_ocurrido, 2); // mag_ocurrido -- 1 byte (2 hex chars)
+    hexString += stringHEX(nivel_bateria, 4); // nivel_bateria -- 2 bytes (4 hex chars)
+    hexString += stringHEX(presion_media, 4); // presion_media -- 2 bytes (4 hex chars)
+    hexString += stringHEX(humedad_media, 4); // humedad_media -- 2 bytes (4 hex chars)
+        
     String msg_header = "Packed bits (HEX): ";
-    Util::debug_print(msg_header + hex_bits);
+    Util::debug_print(msg_header + hexString);
 
     if (SEND_SIGFOX_MESSAGES) {
-      Util::debug_print(F("Sending temperature over SigFox::.."));
+      Util::debug_print(F("Sending over SigFox..."));
 
       digitalWrite(LED_PIN, HIGH);   // turn the LED on (HIGH is the voltage level)
 
-      String chip_response = SigFox::send_at_command("AT$SF=" + hex_bits, 6000);
+      String chip_response = SigFox::send_at_command("AT$SF=" + hexString, 6000);
       Util::debug_print("Reponse from sigfox module: " + chip_response);
 
       digitalWrite(LED_PIN, LOW);    // turn the LED off by making the voltage LOW
