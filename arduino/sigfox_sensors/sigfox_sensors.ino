@@ -19,6 +19,8 @@ const byte BME_ADDRESS = 0x76;
 
 //set to false for debug and to avoid sending messages but still take sensor readings
 bool SEND_SIGFOX_MESSAGES = true;
+//set to false to avoid waiting for the reception of downlink messages
+bool RECEIVE_SIGFOX_MESSAGES = true;
 
 //declare LIS3DH accelerometer
 LIS3DH myIMU(SPI_MODE, 10); // constructed with parameters for SPI and cs pin number
@@ -223,6 +225,7 @@ void loop() {
   if (DEBUG_MODE) {
     delay(100);
   }
+ 
   // go to lowest power for maximum period (8 seconds)
   LowPower.powerDown(SLEEP_8S, ADC_OFF, BOD_OFF);
 
@@ -305,10 +308,10 @@ void loop() {
     Util::debug_print("Mensaje Sigfox - Altitud media: " + String(altitud_media));
 
     // Sigfox message of maximum 12 bytes
-    String hexString = stringHEX(temperatura_media, 4); // temperatura_media -- 2 bytes (4 hex chars)
-    hexString += stringHEX(luz_media, 4); // luz_media -- 2 bytes (4 hex chars)
-    hexString += stringHEX(choque_ocurrido, 2); // choque_ocurrido -- 1 byte (2 hex chars)
+    String hexString = stringHEX(choque_ocurrido, 2); // choque_ocurrido -- 1 byte (2 hex chars)
     hexString += stringHEX(mag_ocurrido, 2); // mag_ocurrido -- 1 byte (2 hex chars)
+    hexString += stringHEX(temperatura_media, 4); // temperatura_media -- 2 bytes (4 hex chars)
+    hexString += stringHEX(luz_media, 4); // luz_media -- 2 bytes (4 hex chars)
     hexString += stringHEX(nivel_bateria, 4); // nivel_bateria -- 2 bytes (4 hex chars)
     hexString += stringHEX(presion_media, 4); // presion_media -- 2 bytes (4 hex chars)
     hexString += stringHEX(humedad_media, 4); // humedad_media -- 2 bytes (4 hex chars)
@@ -321,8 +324,25 @@ void loop() {
 
       digitalWrite(LED_PIN, HIGH);   // turn the LED on (HIGH is the voltage level)
 
-      String chip_response = SigFox::send_at_command("AT$SF=" + hexString, 6000);
+      String chip_response = SigFox::send_at_command("AT$SF=" + hexString + ",1", 6000);
       Util::debug_print("Reponse from sigfox module: " + chip_response);
+
+      if (RECEIVE_SIGFOX_MESSAGES) {
+        Util::debug_print(F("Waiting for sigfox downlink response..."));
+        delay(45000);
+        String downlink_message = SigFox::recv_from_sigfox();
+        Util::debug_print("Received message: " + downlink_message);
+        Util::debug_print("Downlink: " + downlink_message.substring(7, 15));
+        char string_hex[9];
+        downlink_message.substring(7, 15).toCharArray(string_hex, 9);
+        uint8_t valor_primero;
+        uint8_t valor_segundo;
+        uint8_t valor_tercero;
+        sscanf(string_hex, "%x %x %x", &valor_primero, &valor_segundo, &valor_tercero);  
+        Util::debug_print("Valor primero: " + String(valor_primero));
+        Util::debug_print("Valor segundo: " + String(valor_segundo));
+        Util::debug_print("Valor tercero: " + String(valor_tercero));
+      }
 
       digitalWrite(LED_PIN, LOW);    // turn the LED off by making the voltage LOW
 
