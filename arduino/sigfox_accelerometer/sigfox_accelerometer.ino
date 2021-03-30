@@ -33,13 +33,13 @@ uint8_t zZmax = 0;
 uint8_t totalXaxis = 0;
 uint8_t totalYaxis = 0;
 uint8_t totalZaxis = 0;
-uint8_t thresholdXaxis = 10; //0...256
-uint8_t thresholdYaxis = 10; //0...256
-uint8_t thresholdZaxis = 10; //0...256
+uint8_t thresholdXaxis = 255; //0...255
+uint8_t thresholdYaxis = 255; //0...255
+uint8_t thresholdZaxis = 255; //0...255
 uint8_t shockPin = 0;
 uint8_t shockEventLasthour = 0;
 uint8_t rotation_occurred = 0;
-uint8_t battery_level = getBatteryLevel(Util::readVcc());
+uint8_t battery_level = 0;
 
 void setup() {
   pinMode(LED_PIN, OUTPUT);
@@ -80,10 +80,8 @@ void setup() {
   if (accel_ok) {
     Util::debug_print(F("Accel chip. Accel OK."));
     uint8_t dataRead;
-    Serial.print("Reg31H=");
     myIMU.readRegister(&dataRead, 0x31);//cleared by reading
-    Serial.print(dataRead, BIN);
-    Serial.println(";");
+    Util::debug_print("Reg31H=" + String(dataRead, BIN););
     Util::blink_led(1);
 
   } else {
@@ -148,8 +146,6 @@ String getSigFoxMessage(uint8_t sequence, uint8_t rotation_occurred, uint8_t acc
 //main program loop
 void loop() {
 
-  //unsigned int ui = 0; //remove this
-
   //Util::debug_print("Setting Arduino Low Power Mode...");
   if (DEBUG_MODE) {
     delay(100);
@@ -165,8 +161,6 @@ void loop() {
     uint8_t dataReadX;
     uint8_t dataReadY;
     uint8_t dataReadZ;
-
-    Serial.print("Accel: ");
 
     // accel x
     dataReadX = abs(Util::round_float(myIMU.readFloatAccelX() * 1000 / 7.8125));
@@ -207,7 +201,7 @@ void loop() {
     if (dataReadX > thresholdXaxis ||  dataReadY > thresholdYaxis || dataReadZ > thresholdZaxis) {
       // send sigfox message
 
-      Util::debug_print(F("Set sigfox wake up..."));
+      Util::debug_print(F("Set sigfox wake up to send above threshold alert message..."));
       SigFox::set_sigfox_sleep(false);
 
       // get message of maximum 12 bytes
