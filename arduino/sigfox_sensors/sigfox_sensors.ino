@@ -3,7 +3,6 @@
 #include <SparkFunLIS3DH.h> // from SparkFun: https://github.com/sparkfun/SparkFun_LIS3DH_Arduino_Library
 #include <Adafruit_BME280.h>
 
-#include "BitPacker.h"
 #include "util.h"
 #include "Sigfox.h"
 #include "accel.h"
