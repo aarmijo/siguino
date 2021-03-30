@@ -6,6 +6,8 @@
 #include "Sigfox.h"
 #include "accel.h"
 
+#define VCC_MIN 2000
+#define VCC_MAX 4000
 
 //set to false for debug and to avoid sending messages but still take sensor readings
 bool SEND_SIGFOX_MESSAGES = false;
@@ -25,18 +27,19 @@ bool shock_powered_down = false;
 unsigned int seq_num = 0;
 enum POWER_MODE {OFF = 0, ON = 1};
 int init_vcc = 0;
-
-uint16_t xXmax=0;
-uint16_t yYmax=0;
-uint16_t zZmax=0;
-uint16_t totalXaxis=0;
-uint16_t totalYaxis=0;
-uint16_t totalZaxis=0;
-uint8_t thresholdXaxis=10; //0...127
-uint8_t thresholdYaxis=10; //0...127
-uint8_t thresholdZaxis=10; //0...127
+uint8_t xXmax=0;
+uint8_t yYmax=0;
+uint8_t zZmax=0;
+uint8_t totalXaxis=0;
+uint8_t totalYaxis=0;
+uint8_t totalZaxis=0;
+uint8_t thresholdXaxis=10; //0...256
+uint8_t thresholdYaxis=10; //0...256
+uint8_t thresholdZaxis=10; //0...256
 uint8_t shockPin = 0;
 uint8_t shockEventLasthour=0;
+uint8_t rotation_occurred = 0;
+uint8_t battery_level = getBatteryLevel(Util::readVcc());
 
 void setup() {
   pinMode(LED_PIN, OUTPUT);
@@ -127,71 +130,113 @@ uint8_t getBatteryLevel(uint16_t ba)
   return(ba);
 }
 
+String getSigFoxMessage(uint8_t sequence, uint8_t rotation_occurred, uint8_t accel_x, uint8_t accel_y, uint8_t accel_z, uint8_t battery_level, uint8_t thresholdXaxis, uint8_t thresholdYaxis, uint8_t thresholdZaxis) {
+    // Sigfox message of maximum 12 bytes
+    String hexString = stringHEX(sequence, 2); // sequence -- 1 byte (2 hex chars)
+    hexString += stringHEX(rotation_occurred, 2); // rotation_occurred -- 1 byte (2 hex chars)
+    hexString += stringHEX(accel_x, 2); // accel_x -- 1 byte (2 hex chars)
+    hexString += stringHEX(accel_y, 2); // accel_y -- 1 byte (2 hex chars)
+    hexString += stringHEX(accel_z, 2); // accel_z -- 1 byte (2 hex chars)
+    hexString += stringHEX(battery_level, 2); // battery_level -- 1 byte (2 hex chars)
+    hexString += stringHEX(thresholdXaxis, 2); // thresholdXaxis -- 1 byte (2 hex chars)
+    hexString += stringHEX(thresholdYaxis, 2); // thresholdYaxis -- 1 byte (2 hex chars)
+    hexString += stringHEX(thresholdZaxis, 2); // thresholdZaxis -- 1 byte (2 hex chars)
+    return hexString;
+}
+
 //main program loop
 void loop() {
 
-  unsigned int ui = 0;
+  //unsigned int ui = 0; //remove this
 
-  Util::debug_print("Setting Arduino Low Power Mode...");
+  //Util::debug_print("Setting Arduino Low Power Mode...");
   if (DEBUG_MODE) {
     delay(100);
   }
  
   // go to lowest power for maximum period (8 seconds)
-  LowPower.powerDown(SLEEP_8S, ADC_OFF, BOD_OFF);
+  //LowPower.powerDown(SLEEP_8S, ADC_OFF, BOD_OFF);
 
   if (shockPin==1)
   {
     shockEventLasthour++;
-    Serial.print("Wake up after INT.");
-    uint8_t dataRead;
-    uint16_t sh;
+    Util::debug_print(F("Wake up after INT. Accel:"));
+    uint8_t dataReadX;
+    uint8_t dataReadY;
+    uint8_t dataReadZ;
     
     Serial.print("Accel: ");
 
-    Serial.print("X:");
-    myIMU.readRegister(&dataRead, 0x28);//cleared by reading
-    sh=dataRead;
-    myIMU.readRegister(&dataRead, 0x29);//cleared by reading
-    sh=sh+(dataRead*256);
-    if (xXmax<sh)
+    // accel x
+    dataReadX = abs(Util::round_float(myIMU.readFloatAccelX()*1000/7.8125));
+    Util::debug_print("Current X accel abs (0-255): " + String(dataReadX));
+    if (xXmax<dataReadX)
     {
-      xXmax=sh;
+      xXmax=dataReadX;
     }
-    Serial.print(sh, DEC);
-    totalXaxis += sh;
+    totalXaxis += dataReadX;
 
-
-    Serial.print(",Y:");
-    myIMU.readRegister(&dataRead, 0x2A);//cleared by reading
-    sh=dataRead;
-    myIMU.readRegister(&dataRead, 0x2B);//cleared by reading
-    sh=sh+(dataRead*256);
-    if (yYmax<sh)
+    // accel y
+    dataReadY = abs(Util::round_float(myIMU.readFloatAccelY()*1000/7.8125));
+    Util::debug_print("Current Y accel abs (0-255): " + String(dataReadY));
+    if (yYmax<dataReadY)
     {
-      yYmax=sh;
+      yYmax=dataReadY;
     }
-    Serial.print(sh, DEC);
-    totalYaxis += sh;
+    totalYaxis += dataReadY;
 
-    Serial.print(",Z:");
-    myIMU.readRegister(&dataRead, 0x2C);//cleared by reading
-    sh=dataRead;
-    myIMU.readRegister(&dataRead, 0x2D);//cleared by reading
-    sh=sh+(dataRead*256);
-    if (zZmax<sh)
+    // accel z
+    dataReadZ = abs(Util::round_float(myIMU.readFloatAccelZ()*1000/7.8125));
+    Util::debug_print("Current Z accel abs (0-255): " + String(dataReadZ));
+    if (zZmax<dataReadZ)
     {
-      zZmax=sh;
+      zZmax=dataReadZ;
     }
-    Serial.print(sh, DEC);
-    Serial.println(";");  
-    totalZaxis += sh;   
+    totalZaxis += dataReadZ;
 
     shockPin=0;
     num_readings++;
 
+        if (dataReadX > thresholdXaxis ||  dataReadY > thresholdYaxis || dataReadZ > thresholdZaxis) {
+          // send sigfox message
+
+             Util::debug_print(F("Set sigfox wake up..."));
+             SigFox::set_sigfox_sleep(false);
+
+             // get message of maximum 12 bytes
+             String hexString = getSigFoxMessage(seq_num, rotation_occurred, xXmax, yYmax, zZmax, battery_level, thresholdXaxis, thresholdYaxis, thresholdZaxis);
+        
+             String msg_header = "Sigfox message (HEX): ";
+             Util::debug_print(msg_header + hexString);
+    
+            if (SEND_SIGFOX_MESSAGES) {
+              Util::debug_print(F("Sending over SigFox above threshold alert message..."));
+        
+              digitalWrite(LED_PIN, HIGH);   // turn the LED on (HIGH is the voltage level)
+        
+              String chip_response = SigFox::send_at_command("AT$SF=" + hexString, 6000);
+              Util::debug_print("Reponse from sigfox module: " + chip_response);
+        
+              digitalWrite(LED_PIN, LOW);    // turn the LED off by making the voltage LOW
+        
+            } else {
+              Util::debug_print(F("Skipping Sigfox message sending..."));
+            }
+        
+          Util::debug_print(F("Set sigfox sleep mode..."));
+          SigFox::set_sigfox_sleep(true);      
+          totalXaxis = 0;
+          totalYaxis = 0;
+          totalZaxis = 0;
+          xXmax = 0;
+          yYmax = 0;
+          zZmax = 0;
+          rotation_occurred = 0;
+          num_readings = 0;
+          period_count = 0;
+    }
     // TODO check against thresholds and send sigfox message if exceeded. Reset num_readings and period count within control block
-    Util::debug_print(F("Sending sigfox message because threshold exceeded..."));
+    //Util::debug_print(F("Sending sigfox message because threshold exceeded..."));
   }  
 
   if (period_count >= SIGFOX_WAIT_PERIODS) {
@@ -200,49 +245,38 @@ void loop() {
     Util::debug_print(F("Set sigfox wake up..."));
     SigFox::set_sigfox_sleep(false);
 
-    // chequear rotación
+    // check rotation
     uint16_t meanXaxis = totalXaxis/num_readings;
     uint16_t meanYaxis = totalYaxis/num_readings;
     uint16_t meanZaxis = totalZaxis/num_readings;
 
-    uint8_t rotacion_ocurrida = 0;
     if (meanXaxis > 0 && meanYaxis > 0 && meanZaxis > 0) {
-      rotacion_ocurrida = 1;
+      rotation_occurred = 1;
     }
 
-    // secuencia
-    uint8_t secuencia = seq_num;
-    Util::debug_print("Mensaje Sigfox - Secuencia: " + String(secuencia));
+    // sequence    
+    Util::debug_print("Message Sigfox - Sequence: " + String(seq_num));
 
     // x max
-    uint8_t aceleracion_max_x = xXmax>>8;
+    Util::debug_print("Message Sigfox - Acc X max: " + String(xXmax));
 
     // y max
-    uint8_t aceleracion_max_y = xYmax>>8;
+    Util::debug_print("Message Sigfox - Acc Y max: " + String(yYmax));
 
     // z max
-    uint8_t aceleracion_max_z = xZmax>>8;
+    Util::debug_print("Message Sigfox - Acc Z max: " + String(zZmax));
 
-    // nivel de batería
-    uint8_t nivel_bateria = getBatteryLevel(Util::readVcc());
+    // battery level
+    battery_level = getBatteryLevel(Util::readVcc());
 
-    // Sigfox message of maximum 12 bytes
-    String hexString = stringHEX(secuencia, 2); // secuencia -- 1 byte (2 hex chars)
-    hexString += stringHEX(rotacion_ocurrida, 2); // rotacion_ocurrida -- 1 byte (2 hex chars)
-    hexString += stringHEX(aceleracion_max_x, 2); // aceleracion_max_x -- 1 byte (2 hex chars)
-    hexString += stringHEX(aceleracion_max_y, 2); // aceleracion_max_y -- 1 byte (2 hex chars)
-    hexString += stringHEX(aceleracion_max_z, 2); // aceleracion_max_z -- 1 byte (2 hex chars)
-    hexString += stringHEX(nivel_bateria, 2); // nivel_bateria -- 1 byte (2 hex chars)
-    hexString += stringHEX(thresholdXaxis, 2); // thresholdXaxis -- 1 byte (2 hex chars)
-    hexString += stringHEX(thresholdYaxis, 2); // thresholdYaxis -- 1 byte (2 hex chars)
-    hexString += stringHEX(thresholdZaxis, 2); // thresholdZaxis -- 1 byte (2 hex chars)
-
+    // get message of maximum 12 bytes
+    String hexString = getSigFoxMessage(seq_num, rotation_occurred, xXmax, yYmax, zZmax, battery_level, thresholdXaxis, thresholdYaxis, thresholdZaxis);
         
     String msg_header = "Sigfox message (HEX): ";
     Util::debug_print(msg_header + hexString);
 
     if (SEND_SIGFOX_MESSAGES) {
-      Util::debug_print(F("Sending over SigFox..."));
+      Util::debug_print(F("Sending over SigFox keep alive message..."));
 
       digitalWrite(LED_PIN, HIGH);   // turn the LED on (HIGH is the voltage level)
 
@@ -278,6 +312,10 @@ void loop() {
     totalXaxis = 0;
     totalYaxis = 0;
     totalZaxis = 0;
+    xXmax = 0;
+    yYmax = 0;
+    zZmax = 0;
+    rotation_occurred = 0;
     num_readings = 0;
     period_count = 0;
     seq_num++;
