@@ -130,7 +130,7 @@ uint8_t getBatteryLevel(uint16_t ba)
   return (ba);
 }
 
-String getSigFoxMessage(uint8_t sequence, uint8_t rotation_occurred, uint8_t accel_x, uint8_t accel_y, uint8_t accel_z, uint8_t battery_level, uint8_t thresholdXaxis, uint8_t thresholdYaxis, uint8_t thresholdZaxis) {
+String getSigFoxMessage(uint8_t sequence, uint8_t rotation_occurred, uint8_t accel_x, uint8_t accel_y, uint8_t accel_z, uint8_t battery_level, uint8_t thresholdXaxis, uint8_t thresholdYaxis, uint8_t thresholdZaxis, uint8_t shockEventLasthour) {
   // Sigfox message of maximum 12 bytes
   String hexString = stringHEX(sequence, 2); // sequence -- 1 byte (2 hex chars)
   hexString += stringHEX(rotation_occurred, 2); // rotation_occurred -- 1 byte (2 hex chars)
@@ -141,6 +141,7 @@ String getSigFoxMessage(uint8_t sequence, uint8_t rotation_occurred, uint8_t acc
   hexString += stringHEX(thresholdXaxis, 2); // thresholdXaxis -- 1 byte (2 hex chars)
   hexString += stringHEX(thresholdYaxis, 2); // thresholdYaxis -- 1 byte (2 hex chars)
   hexString += stringHEX(thresholdZaxis, 2); // thresholdZaxis -- 1 byte (2 hex chars)
+  hexString += stringHEX(shockEventLasthour, 2); // shockEventLasthour -- 1 byte (2 hex chars)
   return hexString;
 }
 
@@ -155,7 +156,7 @@ void loop() {
   }
 
   // go to lowest power for maximum period (8 seconds)
-  //LowPower.powerDown(SLEEP_8S, ADC_OFF, BOD_OFF);
+  LowPower.powerDown(SLEEP_8S, ADC_OFF, BOD_OFF);
 
   if (shockPin == 1)
   {
@@ -175,6 +176,8 @@ void loop() {
       xXmax = dataReadX;
     }
     totalXaxis += dataReadX;
+    Util::debug_print("X accel max (0-255): " + String(xXmax));
+    Util::debug_print("X accel total (0-255): " + String(totalXaxis));
 
     // accel y
     dataReadY = abs(Util::round_float(myIMU.readFloatAccelY() * 1000 / 7.8125));
@@ -184,6 +187,8 @@ void loop() {
       yYmax = dataReadY;
     }
     totalYaxis += dataReadY;
+    Util::debug_print("Y accel max (0-255): " + String(yYmax));
+    Util::debug_print("Y accel total (0-255): " + String(totalYaxis));
 
     // accel z
     dataReadZ = abs(Util::round_float(myIMU.readFloatAccelZ() * 1000 / 7.8125));
@@ -193,6 +198,8 @@ void loop() {
       zZmax = dataReadZ;
     }
     totalZaxis += dataReadZ;
+    Util::debug_print("Z accel max (0-255): " + String(zZmax));
+    Util::debug_print("Z accel total (0-255): " + String(totalZaxis));
 
     shockPin = 0;
     num_readings++;
@@ -204,7 +211,7 @@ void loop() {
       SigFox::set_sigfox_sleep(false);
 
       // get message of maximum 12 bytes
-      String hexString = getSigFoxMessage(seq_num, rotation_occurred, xXmax, yYmax, zZmax, battery_level, thresholdXaxis, thresholdYaxis, thresholdZaxis);
+      String hexString = getSigFoxMessage(seq_num, rotation_occurred, xXmax, yYmax, zZmax, battery_level, thresholdXaxis, thresholdYaxis, thresholdZaxis, shockEventLasthour);
 
       String msg_header = "Sigfox message (HEX): ";
       Util::debug_print(msg_header + hexString);
@@ -232,11 +239,10 @@ void loop() {
       yYmax = 0;
       zZmax = 0;
       rotation_occurred = 0;
+      shockEventLasthour = 0;
       num_readings = 0;
       period_count = 0;
     }
-    // TODO check against thresholds and send sigfox message if exceeded. Reset num_readings and period count within control block
-    //Util::debug_print(F("Sending sigfox message because threshold exceeded..."));
   }
 
   if (period_count >= SIGFOX_WAIT_PERIODS) {
@@ -270,7 +276,7 @@ void loop() {
     battery_level = getBatteryLevel(Util::readVcc());
 
     // get message of maximum 12 bytes
-    String hexString = getSigFoxMessage(seq_num, rotation_occurred, xXmax, yYmax, zZmax, battery_level, thresholdXaxis, thresholdYaxis, thresholdZaxis);
+    String hexString = getSigFoxMessage(seq_num, rotation_occurred, xXmax, yYmax, zZmax, battery_level, thresholdXaxis, thresholdYaxis, thresholdZaxis, shockEventLasthour);
 
     String msg_header = "Sigfox message (HEX): ";
     Util::debug_print(msg_header + hexString);
@@ -316,6 +322,7 @@ void loop() {
     yYmax = 0;
     zZmax = 0;
     rotation_occurred = 0;
+    shockEventLasthour = 0;
     num_readings = 0;
     period_count = 0;
     seq_num++;
