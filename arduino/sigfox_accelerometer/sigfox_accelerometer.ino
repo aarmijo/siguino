@@ -30,9 +30,9 @@ int init_vcc = 0;
 uint8_t xXmax = 0;
 uint8_t yYmax = 0;
 uint8_t zZmax = 0;
-uint8_t totalXaxis = 0;
-uint8_t totalYaxis = 0;
-uint8_t totalZaxis = 0;
+int totalXaxis = 0;
+int totalYaxis = 0;
+int totalZaxis = 0;
 uint8_t thresholdXaxis = 255; //0...255
 uint8_t thresholdYaxis = 255; //0...255
 uint8_t thresholdZaxis = 255; //0...255
@@ -146,7 +146,7 @@ String getSigFoxMessage(uint8_t sequence, uint8_t rotation_occurred, uint8_t acc
 //main program loop
 void loop() {
 
-  Util::debug_print("Period counts : SigFox wait periods - " + String(period_count) + " : " + String(SIGFOX_WAIT_PERIODS));
+  Util::debug_print("\nPeriod counts : SigFox wait periods - " + String(period_count) + " : " + String(SIGFOX_WAIT_PERIODS));
 
   //Util::debug_print("Setting Arduino Low Power Mode...");
   if (DEBUG_MODE) {
@@ -159,7 +159,7 @@ void loop() {
   if (shockPin == 1)
   {
     shockEventLasthour++;
-    Util::debug_print("Shock events last SigFox wait period: " + String(shockEventLasthour));
+    Util::debug_print("\nShock events last SigFox wait period: " + String(shockEventLasthour));
     Util::debug_print(F("Wake up after INT. Accel:"));
     uint8_t dataReadX;
     uint8_t dataReadY;
@@ -249,9 +249,9 @@ void loop() {
     SigFox::set_sigfox_sleep(false);
 
     // check rotation
-    uint16_t meanXaxis = totalXaxis / num_readings;
-    uint16_t meanYaxis = totalYaxis / num_readings;
-    uint16_t meanZaxis = totalZaxis / num_readings;
+    float meanXaxis = float(totalXaxis) / float(num_readings);
+    float meanYaxis = float(totalYaxis) / float(num_readings);
+    float meanZaxis = float(totalZaxis) / float(num_readings);
 
     if (meanXaxis > 0 && meanYaxis > 0 && meanZaxis > 0) {
       rotation_occurred = 1;
