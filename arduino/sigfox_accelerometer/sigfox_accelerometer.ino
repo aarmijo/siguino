@@ -81,7 +81,7 @@ void setup() {
     Util::debug_print(F("Accel chip. Accel OK."));
     uint8_t dataRead;
     myIMU.readRegister(&dataRead, 0x31);//cleared by reading
-    Util::debug_print("Reg31H=" + String(dataRead, BIN););
+    Util::debug_print("Reg31H=" + String(dataRead, BIN));
     Util::blink_led(1);
 
   } else {
@@ -146,6 +146,8 @@ String getSigFoxMessage(uint8_t sequence, uint8_t rotation_occurred, uint8_t acc
 //main program loop
 void loop() {
 
+  Util::debug_print("Period counts : SigFox wait periods - " + String(period_count) + " : " + String(SIGFOX_WAIT_PERIODS));
+
   //Util::debug_print("Setting Arduino Low Power Mode...");
   if (DEBUG_MODE) {
     delay(100);
@@ -157,6 +159,7 @@ void loop() {
   if (shockPin == 1)
   {
     shockEventLasthour++;
+    Util::debug_print("Shock events last SigFox wait period: " + String(shockEventLasthour));
     Util::debug_print(F("Wake up after INT. Accel:"));
     uint8_t dataReadX;
     uint8_t dataReadY;
