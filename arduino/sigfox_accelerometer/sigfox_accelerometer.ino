@@ -193,14 +193,19 @@ void loop() {
     num_readings++;
 
     if (dataReadX > thresholdXaxis || dataReadY > thresholdYaxis || dataReadZ > thresholdZaxis || dataReadY < 63) {
-      Util::debug_print(F("Set sigfox wake up to send above threshold alert message..."));
+      Util::debug_print(F("Set sigfox wake up to send event message..."));
       SigFox::set_sigfox_sleep(false);
 
       // rotation if accel in Y is lower than 127/2
       if (dataReadY < 63) {
-        Util::debug_print("Rotation occurred around X axis");
+        Util::debug_print("Rotation occurred around X axis!");
         rotation_occurred = 1;
       }
+
+      if (dataReadX > thresholdXaxis || dataReadY > thresholdYaxis || dataReadZ > thresholdZaxis) {
+        Util::debug_print("Above threshold event occurred!");
+      }
+      
       // get message of maximum 12 bytes
       String hexString = getSigFoxMessage(seq_num, rotation_occurred, xXmax, yYmax, zZmax, battery_level, thresholdXaxis, thresholdYaxis, thresholdZaxis, shockEventLasthour);
 
@@ -208,7 +213,7 @@ void loop() {
       Util::debug_print(msg_header + hexString);
 
       if (SEND_SIGFOX_MESSAGES) {
-        Util::debug_print(F("Sending over SigFox above threshold alert message..."));
+        Util::debug_print(F("Sending over SigFox event message..."));
 
         digitalWrite(LED_PIN, HIGH); // turn the LED on (HIGH is the voltage level)
 
@@ -236,7 +241,7 @@ void loop() {
   if (period_count >= SIGFOX_WAIT_PERIODS) {
     //only send data over sigfox every SIGFOX_WAIT_PERIODS (e.g. 8 = 8x8 seconds, ~ every minute)
     Util::debug_print(F("Sending period has occurred..."));
-    Util::debug_print(F("Set sigfox wake up..."));
+    Util::debug_print(F("Set sigfox wake up to send keep alive message..."));
     SigFox::set_sigfox_sleep(false);
 
     // sequence
