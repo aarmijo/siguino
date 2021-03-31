@@ -30,9 +30,6 @@ int init_vcc = 0;
 uint8_t xXmax = 0;
 uint8_t yYmax = 0;
 uint8_t zZmax = 0;
-int totalXaxis = 0;
-int totalYaxis = 0;
-int totalZaxis = 0;
 uint8_t thresholdXaxis = 255; //0...255
 uint8_t thresholdYaxis = 255; //0...255
 uint8_t thresholdZaxis = 255; //0...255
@@ -172,9 +169,7 @@ void loop() {
     {
       xXmax = dataReadX;
     }
-    totalXaxis += dataReadX;
     Util::debug_print("X accel max (0-255): " + String(xXmax));
-    Util::debug_print("X accel total (0-255): " + String(totalXaxis));
 
     // accel y
     dataReadY = abs(Util::round_float(myIMU.readFloatAccelY() * 1000 / 7.8125));
@@ -183,9 +178,7 @@ void loop() {
     {
       yYmax = dataReadY;
     }
-    totalYaxis += dataReadY;
     Util::debug_print("Y accel max (0-255): " + String(yYmax));
-    Util::debug_print("Y accel total (0-255): " + String(totalYaxis));
 
     // accel z
     dataReadZ = abs(Util::round_float(myIMU.readFloatAccelZ() * 1000 / 7.8125));
@@ -194,19 +187,20 @@ void loop() {
     {
       zZmax = dataReadZ;
     }
-    totalZaxis += dataReadZ;
     Util::debug_print("Z accel max (0-255): " + String(zZmax));
-    Util::debug_print("Z accel total (0-255): " + String(totalZaxis));
 
     shockPin = 0;
     num_readings++;
 
-    if (dataReadX > thresholdXaxis ||  dataReadY > thresholdYaxis || dataReadZ > thresholdZaxis) {
-      // send sigfox message
-
+    if (dataReadX > thresholdXaxis || dataReadY > thresholdYaxis || dataReadZ > thresholdZaxis || dataReadY < 63) {
       Util::debug_print(F("Set sigfox wake up to send above threshold alert message..."));
       SigFox::set_sigfox_sleep(false);
 
+      // rotation if accel in Y is lower than 127/2
+      if (dataReadY < 63) {
+        Util::debug_print("Rotation occurred around X axis");
+        rotation_occurred = 1;
+      }
       // get message of maximum 12 bytes
       String hexString = getSigFoxMessage(seq_num, rotation_occurred, xXmax, yYmax, zZmax, battery_level, thresholdXaxis, thresholdYaxis, thresholdZaxis, shockEventLasthour);
 
@@ -216,12 +210,12 @@ void loop() {
       if (SEND_SIGFOX_MESSAGES) {
         Util::debug_print(F("Sending over SigFox above threshold alert message..."));
 
-        digitalWrite(LED_PIN, HIGH);   // turn the LED on (HIGH is the voltage level)
+        digitalWrite(LED_PIN, HIGH); // turn the LED on (HIGH is the voltage level)
 
         String chip_response = SigFox::send_at_command("AT$SF=" + hexString, 6000);
         Util::debug_print("Reponse from sigfox module: " + chip_response);
 
-        digitalWrite(LED_PIN, LOW);    // turn the LED off by making the voltage LOW
+        digitalWrite(LED_PIN, LOW); // turn the LED off by making the voltage LOW
 
       } else {
         Util::debug_print(F("Skipping Sigfox message sending..."));
@@ -229,9 +223,6 @@ void loop() {
 
       Util::debug_print(F("Set sigfox sleep mode..."));
       SigFox::set_sigfox_sleep(true);
-      totalXaxis = 0;
-      totalYaxis = 0;
-      totalZaxis = 0;
       xXmax = 0;
       yYmax = 0;
       zZmax = 0;
@@ -248,17 +239,14 @@ void loop() {
     Util::debug_print(F("Set sigfox wake up..."));
     SigFox::set_sigfox_sleep(false);
 
-    // check rotation
-    float meanXaxis = float(totalXaxis) / float(num_readings);
-    float meanYaxis = float(totalYaxis) / float(num_readings);
-    float meanZaxis = float(totalZaxis) / float(num_readings);
-
-    if (meanXaxis > 0 && meanYaxis > 0 && meanZaxis > 0) {
-      rotation_occurred = 1;
-    }
-
     // sequence
     Util::debug_print("Message Sigfox - Sequence: " + String(seq_num));
+
+    if (num_readings == 0) {
+      xXmax = abs(Util::round_float(myIMU.readFloatAccelX() * 1000 / 7.8125));
+      yYmax = abs(Util::round_float(myIMU.readFloatAccelY() * 1000 / 7.8125));
+      xXmax = abs(Util::round_float(myIMU.readFloatAccelZ() * 1000 / 7.8125));
+    }
 
     // x max
     Util::debug_print("Message Sigfox - Acc X max: " + String(xXmax));
@@ -281,7 +269,7 @@ void loop() {
     if (SEND_SIGFOX_MESSAGES) {
       Util::debug_print(F("Sending over SigFox keep alive message..."));
 
-      digitalWrite(LED_PIN, HIGH);   // turn the LED on (HIGH is the voltage level)
+      digitalWrite(LED_PIN, HIGH); // turn the LED on (HIGH is the voltage level)
 
       String chip_response = SigFox::send_at_command("AT$SF=" + hexString + ",1", 6000);
       Util::debug_print("Reponse from sigfox module: " + chip_response);
@@ -312,9 +300,6 @@ void loop() {
 
     Util::debug_print(F("Set sigfox sleep mode..."));
     SigFox::set_sigfox_sleep(true);
-    totalXaxis = 0;
-    totalYaxis = 0;
-    totalZaxis = 0;
     xXmax = 0;
     yYmax = 0;
     zZmax = 0;
