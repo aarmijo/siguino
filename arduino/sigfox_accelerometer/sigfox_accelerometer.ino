@@ -25,7 +25,6 @@ volatile int count = 0;
 volatile bool interrupt_listen_shock = true;
 bool shock_powered_down = false;
 unsigned int seq_num = 0;
-enum POWER_MODE {OFF = 0, ON = 1};
 int init_vcc = 0;
 uint8_t xXmax = 0;
 uint8_t yYmax = 0;
