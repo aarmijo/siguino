@@ -31,7 +31,7 @@ uint8_t xXmax = 0;
 uint8_t yYmax = 0;
 uint8_t zZmax = 0;
 uint8_t thresholdXaxis = 255; //0...255
-uint8_t thresholdYaxis = 255; 
+uint8_t thresholdYaxis = 255;
 uint8_t thresholdZaxis = 255; //0...255
 uint8_t thresholdRotation = 63; // 127/2 ~ 45 degrees
 uint8_t shockPin = 0;
@@ -126,9 +126,11 @@ uint8_t getBatteryLevel(uint16_t ba)
   return (ba);
 }
 
-String getSigFoxMessage(uint8_t sequence, uint8_t rotation_occurred, uint8_t accel_x, uint8_t accel_y, uint8_t accel_z, uint8_t battery_level, 
-    uint8_t thresholdXaxis, uint8_t thresholdYaxis, uint8_t thresholdZaxis, uint8_t shockEventLasthour, uint8_t thresholdRotation, uint8_t messageType) {
+String getSigFoxMessage(uint8_t sequence, uint8_t rotation_occurred, uint8_t accel_x, uint8_t accel_y, uint8_t accel_z, uint8_t battery_level,
+                        uint8_t thresholdXaxis, uint8_t thresholdYaxis, uint8_t thresholdZaxis, uint8_t shockEventLasthour, uint8_t thresholdRotation, uint8_t messageType) {
   // Sigfox message of maximum 12 bytes
+  // message type = 0 - keep-alive 
+  // message type = 1 - accel-event
   String hexString = stringHEX(sequence, 2); // sequence -- 1 byte (2 hex chars)
   hexString += stringHEX(rotation_occurred, 2); // rotation_occurred -- 1 byte (2 hex chars)
   hexString += stringHEX(accel_x, 2); // accel_x -- 1 byte (2 hex chars)
@@ -209,7 +211,7 @@ void loop() {
       if (dataReadX > thresholdXaxis || dataReadY > thresholdYaxis || dataReadZ > thresholdZaxis) {
         Util::debug_print("Above threshold event occurred!");
       }
-      
+
       // get message of maximum 12 bytes
       String hexString = getSigFoxMessage(seq_num, rotation_occurred, xXmax, yYmax, zZmax, battery_level, thresholdXaxis, thresholdYaxis, thresholdZaxis, shockEventLasthour, thresholdRotation, 1);
 
