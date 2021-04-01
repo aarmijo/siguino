@@ -31,8 +31,9 @@ uint8_t xXmax = 0;
 uint8_t yYmax = 0;
 uint8_t zZmax = 0;
 uint8_t thresholdXaxis = 255; //0...255
-uint8_t thresholdYaxis = 255; //0...255
+uint8_t thresholdYaxis = 255; 
 uint8_t thresholdZaxis = 255; //0...255
+uint8_t thresholdRotation = 63; // 127/2 ~ 45 degrees
 uint8_t shockPin = 0;
 uint8_t shockEventLasthour = 0;
 uint8_t rotation_occurred = 0;
@@ -145,7 +146,7 @@ void loop() {
 
   Util::debug_print("\nPeriod counts : SigFox wait periods - " + String(period_count) + " : " + String(SIGFOX_WAIT_PERIODS));
 
-  //Util::debug_print("Setting Arduino Low Power Mode...");
+  Util::debug_print("Setting Arduino Low Power Mode...");
   if (DEBUG_MODE) {
     delay(100);
   }
@@ -192,12 +193,12 @@ void loop() {
     shockPin = 0;
     num_readings++;
 
-    if (dataReadX > thresholdXaxis || dataReadY > thresholdYaxis || dataReadZ > thresholdZaxis || dataReadY < 63) {
+    if (dataReadX > thresholdXaxis || dataReadY > thresholdYaxis || dataReadZ > thresholdZaxis || dataReadY < thresholdRotation) {
       Util::debug_print(F("Set sigfox wake up to send event message..."));
       SigFox::set_sigfox_sleep(false);
 
-      // rotation if accel in Y is lower than 127/2
-      if (dataReadY < 63) {
+      // rotation if accel in Y is lower than thresholdRotation
+      if (dataReadY < thresholdRotation) {
         Util::debug_print("Rotation occurred around X axis!");
         rotation_occurred = 1;
       }
