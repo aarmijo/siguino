@@ -129,7 +129,7 @@ uint8_t getBatteryLevel(uint16_t ba)
 String getSigFoxMessage(uint8_t sequence, uint8_t rotation_occurred, uint8_t accel_x, uint8_t accel_y, uint8_t accel_z, uint8_t battery_level,
                         uint8_t thresholdXaxis, uint8_t thresholdYaxis, uint8_t thresholdZaxis, uint8_t shockEventLasthour, uint8_t thresholdRotation, uint8_t messageType) {
   // Sigfox message of maximum 12 bytes
-  // message type = 0 - keep-alive 
+  // message type = 0 - keep-alive
   // message type = 1 - accel-event
   String hexString = stringHEX(sequence, 2); // sequence -- 1 byte (2 hex chars)
   hexString += stringHEX(rotation_occurred, 2); // rotation_occurred -- 1 byte (2 hex chars)
@@ -221,12 +221,16 @@ void loop() {
       if (SEND_SIGFOX_MESSAGES) {
         Util::debug_print(F("Sending over SigFox event message..."));
 
-        digitalWrite(LED_PIN, HIGH); // turn the LED on (HIGH is the voltage level)
+        if (DEBUG_MODE) {
+          digitalWrite(LED_PIN, HIGH); // turn the LED on (HIGH is the voltage level)
+        }
 
         String chip_response = SigFox::send_at_command("AT$SF=" + hexString, 6000);
         Util::debug_print("Reponse from sigfox module: " + chip_response);
 
-        digitalWrite(LED_PIN, LOW); // turn the LED off by making the voltage LOW
+        if (DEBUG_MODE) {
+          digitalWrite(LED_PIN, LOW); // turn the LED off by making the voltage LOW
+        }
 
       } else {
         Util::debug_print(F("Skipping Sigfox event message sending..."));
@@ -280,7 +284,9 @@ void loop() {
     if (SEND_SIGFOX_MESSAGES) {
       Util::debug_print(F("Sending over SigFox keep alive message..."));
 
-      digitalWrite(LED_PIN, HIGH); // turn the LED on (HIGH is the voltage level)
+      if (DEBUG_MODE) {
+        digitalWrite(LED_PIN, HIGH); // turn the LED on (HIGH is the voltage level)
+      }
 
       String chip_response = SigFox::send_at_command("AT$SF=" + hexString + ",1", 6000);
       Util::debug_print("Reponse from sigfox module: " + chip_response);
@@ -308,7 +314,9 @@ void loop() {
         thresholdRotation = downlinkThresholdRotation;
       }
 
-      digitalWrite(LED_PIN, LOW); // turn the LED off by making the voltage LOW
+      if (DEBUG_MODE) {
+        digitalWrite(LED_PIN, LOW); // turn the LED off by making the voltage LOW
+      }
 
     } else {
       Util::debug_print(F("Skipping Sigfox keep alive message sending..."));
