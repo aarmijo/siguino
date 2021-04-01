@@ -126,7 +126,8 @@ uint8_t getBatteryLevel(uint16_t ba)
   return (ba);
 }
 
-String getSigFoxMessage(uint8_t sequence, uint8_t rotation_occurred, uint8_t accel_x, uint8_t accel_y, uint8_t accel_z, uint8_t battery_level, uint8_t thresholdXaxis, uint8_t thresholdYaxis, uint8_t thresholdZaxis, uint8_t shockEventLasthour) {
+String getSigFoxMessage(uint8_t sequence, uint8_t rotation_occurred, uint8_t accel_x, uint8_t accel_y, uint8_t accel_z, uint8_t battery_level, 
+    uint8_t thresholdXaxis, uint8_t thresholdYaxis, uint8_t thresholdZaxis, uint8_t shockEventLasthour, uint8_t thresholdRotation, uint8_t messageType) {
   // Sigfox message of maximum 12 bytes
   String hexString = stringHEX(sequence, 2); // sequence -- 1 byte (2 hex chars)
   hexString += stringHEX(rotation_occurred, 2); // rotation_occurred -- 1 byte (2 hex chars)
@@ -138,6 +139,8 @@ String getSigFoxMessage(uint8_t sequence, uint8_t rotation_occurred, uint8_t acc
   hexString += stringHEX(thresholdYaxis, 2); // thresholdYaxis -- 1 byte (2 hex chars)
   hexString += stringHEX(thresholdZaxis, 2); // thresholdZaxis -- 1 byte (2 hex chars)
   hexString += stringHEX(shockEventLasthour, 2); // shockEventLasthour -- 1 byte (2 hex chars)
+  hexString += stringHEX(thresholdRotation, 2); // thresholdRotation -- 1 byte (2 hex chars)
+  hexString += stringHEX(messageType, 2); // messageType -- 1 byte (2 hex chars)
   return hexString;
 }
 
@@ -208,7 +211,7 @@ void loop() {
       }
       
       // get message of maximum 12 bytes
-      String hexString = getSigFoxMessage(seq_num, rotation_occurred, xXmax, yYmax, zZmax, battery_level, thresholdXaxis, thresholdYaxis, thresholdZaxis, shockEventLasthour);
+      String hexString = getSigFoxMessage(seq_num, rotation_occurred, xXmax, yYmax, zZmax, battery_level, thresholdXaxis, thresholdYaxis, thresholdZaxis, shockEventLasthour, thresholdRotation, 1);
 
       String msg_header = "Sigfox message (HEX): ";
       Util::debug_print(msg_header + hexString);
@@ -224,7 +227,7 @@ void loop() {
         digitalWrite(LED_PIN, LOW); // turn the LED off by making the voltage LOW
 
       } else {
-        Util::debug_print(F("Skipping Sigfox message sending..."));
+        Util::debug_print(F("Skipping Sigfox event message sending..."));
       }
 
       Util::debug_print(F("Set sigfox sleep mode..."));
@@ -267,7 +270,7 @@ void loop() {
     battery_level = getBatteryLevel(Util::readVcc());
 
     // get message of maximum 12 bytes
-    String hexString = getSigFoxMessage(seq_num, rotation_occurred, xXmax, yYmax, zZmax, battery_level, thresholdXaxis, thresholdYaxis, thresholdZaxis, shockEventLasthour);
+    String hexString = getSigFoxMessage(seq_num, rotation_occurred, xXmax, yYmax, zZmax, battery_level, thresholdXaxis, thresholdYaxis, thresholdZaxis, shockEventLasthour, thresholdRotation, 0);
 
     String msg_header = "Sigfox message (HEX): ";
     Util::debug_print(msg_header + hexString);
@@ -285,23 +288,28 @@ void loop() {
         delay(45000);
         String downlink_message = SigFox::recv_from_sigfox();
         Util::debug_print("Received message: " + downlink_message);
-        Util::debug_print("Downlink: " + downlink_message.substring(7, 15));
+        Util::debug_print("Downlink: " + downlink_message.substring(7, 18));
         char string_hex[9];
-        downlink_message.substring(7, 15).toCharArray(string_hex, 9);
-        uint8_t valor_primero;
-        uint8_t valor_segundo;
-        uint8_t valor_tercero;
-        sscanf(string_hex, "%x %x %x", &valor_primero, &valor_segundo, &valor_tercero);
-        Util::debug_print("Valor primero: " + String(valor_primero));
-        Util::debug_print("Valor segundo: " + String(valor_segundo));
-        Util::debug_print("Valor tercero: " + String(valor_tercero));
-        // TODO set thresholds with the downlink values
+        downlink_message.substring(7, 18).toCharArray(string_hex, 12);
+        uint8_t downlinkThresholdXaxis;
+        uint8_t downlinkThresholdYaxis;
+        uint8_t downlinkThresholdZaxis;
+        uint8_t downlinkThresholdRotation;
+        sscanf(string_hex, "%x %x %x %x", &downlinkThresholdXaxis, &downlinkThresholdYaxis, &downlinkThresholdZaxis, &downlinkThresholdRotation);
+        Util::debug_print("Downlink threshold X axis: " + String(downlinkThresholdXaxis));
+        Util::debug_print("Downlink threshold Y axis: " + String(downlinkThresholdXaxis));
+        Util::debug_print("Downlink threshold Z axis: " + String(downlinkThresholdXaxis));
+        Util::debug_print("Downlink threshold rotation: " + String(downlinkThresholdRotation));
+        thresholdXaxis = downlinkThresholdXaxis;
+        thresholdYaxis = downlinkThresholdYaxis;
+        thresholdZaxis = downlinkThresholdZaxis;
+        thresholdRotation = downlinkThresholdRotation;
       }
 
-      digitalWrite(LED_PIN, LOW);    // turn the LED off by making the voltage LOW
+      digitalWrite(LED_PIN, LOW); // turn the LED off by making the voltage LOW
 
     } else {
-      Util::debug_print(F("Skipping Sigfox message sending..."));
+      Util::debug_print(F("Skipping Sigfox keep alive message sending..."));
     }
 
     Util::debug_print(F("Set sigfox sleep mode..."));
