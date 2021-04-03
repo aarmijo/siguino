@@ -302,23 +302,25 @@ void loop() {
         Util::debug_print(F("Waiting for sigfox downlink response..."));
         delay(45000);
         String downlink_message = SigFox::recv_from_sigfox();
-        Util::debug_print("Received message: " + downlink_message);
-        Util::debug_print("Downlink: " + downlink_message.substring(7, 18));
-        char string_hex[12];
-        downlink_message.substring(7, 18).toCharArray(string_hex, 12);
+        Util::debug_print("Received message: " + downlink_message.substring(0, 18));    
         uint8_t downlinkThresholdXaxis;
         uint8_t downlinkThresholdYaxis;
         uint8_t downlinkThresholdZaxis;
-        uint8_t downlinkThresholdRotation;
-        sscanf(string_hex, "%x %x %x %x", &downlinkThresholdXaxis, &downlinkThresholdYaxis, &downlinkThresholdZaxis, &downlinkThresholdRotation);
-        Util::debug_print("Downlink threshold X axis: " + String(downlinkThresholdXaxis));
-        Util::debug_print("Downlink threshold Y axis: " + String(downlinkThresholdYaxis));
-        Util::debug_print("Downlink threshold Z axis: " + String(downlinkThresholdZaxis));
-        Util::debug_print("Downlink threshold rotation: " + String(downlinkThresholdRotation));
-        thresholdXaxis = downlinkThresholdXaxis;
-        thresholdYaxis = downlinkThresholdYaxis;
-        thresholdZaxis = downlinkThresholdZaxis;
-        thresholdRotation = downlinkThresholdRotation;
+        uint8_t downlinkThresholdRotation;    
+        if (downlink_message.substring(0, 2) == "OK") {
+          Util::debug_print("Downlink: " + downlink_message.substring(7, 18));      
+          char string_hex[12];    
+          downlink_message.substring(7, 18).toCharArray(string_hex, 12);
+          sscanf(string_hex, "%x %x %x %x", &downlinkThresholdXaxis, &downlinkThresholdYaxis, &downlinkThresholdZaxis, &downlinkThresholdRotation);
+          Util::debug_print("Downlink threshold X axis: " + String(downlinkThresholdXaxis));
+          Util::debug_print("Downlink threshold Y axis: " + String(downlinkThresholdYaxis));
+          Util::debug_print("Downlink threshold Z axis: " + String(downlinkThresholdZaxis));
+          Util::debug_print("Downlink threshold rotation: " + String(downlinkThresholdRotation));
+          thresholdXaxis = downlinkThresholdXaxis;
+          thresholdYaxis = downlinkThresholdYaxis;
+          thresholdZaxis = downlinkThresholdZaxis;
+          thresholdRotation = downlinkThresholdRotation;
+        }
       }
 
       if (DEBUG_MODE) {
