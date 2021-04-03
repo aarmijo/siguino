@@ -10,9 +10,9 @@
 #define VCC_MAX 4000
 
 //set to false for debug and to avoid sending messages but still take sensor readings
-bool SEND_SIGFOX_MESSAGES = false;
+bool SEND_SIGFOX_MESSAGES = true;
 //set to false to avoid waiting for the reception of downlink messages
-bool RECEIVE_SIGFOX_MESSAGES = false;
+bool RECEIVE_SIGFOX_MESSAGES = true;
 
 //declare LIS3DH accelerometer
 LIS3DH myIMU(SPI_MODE, 10); // constructed with parameters for SPI and cs pin number
@@ -20,16 +20,13 @@ LIS3DH myIMU(SPI_MODE, 10); // constructed with parameters for SPI and cs pin nu
 //"global" vars
 int period_count = 0;
 int num_readings = 0;
-volatile byte shock_state = LOW;
 volatile int count = 0;
-volatile bool interrupt_listen_shock = true;
-bool shock_powered_down = false;
 unsigned int seq_num = 0;
 int init_vcc = 0;
 uint8_t xXmax = 0;
 uint8_t yYmax = 0;
 uint8_t zZmax = 0;
-uint8_t thresholdXaxis = 255; //0...255
+uint8_t thresholdXaxis = 70; //0...255
 uint8_t thresholdYaxis = 255;
 uint8_t thresholdZaxis = 255; //0...255
 uint8_t thresholdRotation = 63; // 127/2 ~ 45 degrees
@@ -62,8 +59,7 @@ void setup() {
 
   Util::debug_print(F("Set sigfox sleep mode..."));
   SigFox::set_sigfox_sleep(true);
-  //need to reset "volatile" variables here to avoid odd results
-  shock_state = LOW;
+  //need to reset "volatile" variable here to avoid odd results
   count = 0;
 
   // POST (power on self test) blinks for correct chip operation
@@ -212,6 +208,10 @@ void loop() {
         Util::debug_print("Above threshold event occurred!");
       }
 
+      // battery level
+      battery_level = getBatteryLevel(Util::readVcc());
+      Util::debug_print("BatteryLevel = ", battery_level, true);
+
       // get message of maximum 12 bytes
       String hexString = getSigFoxMessage(seq_num, rotation_occurred, xXmax, yYmax, zZmax, battery_level, thresholdXaxis, thresholdYaxis, thresholdZaxis, shockEventLastPeriod, thresholdRotation, (shockEventLastPeriod > 254) ? 2 : 1);
 
@@ -274,6 +274,13 @@ void loop() {
 
     // battery level
     battery_level = getBatteryLevel(Util::readVcc());
+    Util::debug_print("Message Sigfox - BatteryLevel: ", battery_level, true);
+
+    // thresholds
+    Util::debug_print("Message Sigfox - Threshold X axis: " + String(thresholdXaxis));
+    Util::debug_print("Message Sigfox - Threshold Y axis: " + String(thresholdYaxis));
+    Util::debug_print("Message Sigfox - Threshold Z axis: " + String(thresholdZaxis));
+    Util::debug_print("Message Sigfox - Threshold rotation: " + String(thresholdRotation));
 
     // shock events during last SigFox wait period
     Util::debug_print("Shock events last SigFox wait period: " + String(shockEventLastPeriod));
@@ -308,8 +315,8 @@ void loop() {
         uint8_t downlinkThresholdRotation;
         sscanf(string_hex, "%x %x %x %x", &downlinkThresholdXaxis, &downlinkThresholdYaxis, &downlinkThresholdZaxis, &downlinkThresholdRotation);
         Util::debug_print("Downlink threshold X axis: " + String(downlinkThresholdXaxis));
-        Util::debug_print("Downlink threshold Y axis: " + String(downlinkThresholdXaxis));
-        Util::debug_print("Downlink threshold Z axis: " + String(downlinkThresholdXaxis));
+        Util::debug_print("Downlink threshold Y axis: " + String(downlinkThresholdYaxis));
+        Util::debug_print("Downlink threshold Z axis: " + String(downlinkThresholdZaxis));
         Util::debug_print("Downlink threshold rotation: " + String(downlinkThresholdRotation));
         thresholdXaxis = downlinkThresholdXaxis;
         thresholdYaxis = downlinkThresholdYaxis;
