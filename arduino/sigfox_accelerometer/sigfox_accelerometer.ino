@@ -2,7 +2,6 @@
 #include <LowPower.h> //from RocketScream: https://github.com/rocketscream/Low-Power
 #include <SparkFunLIS3DH.h> // from SparkFun: https://github.com/sparkfun/SparkFun_LIS3DH_Arduino_Library
 
-#include "util.h"
 #include "Sigfox.h"
 #include "accel.h"
 
@@ -200,17 +199,16 @@ void loop() {
 
       // rotation if accel in Y is lower than thresholdRotation
       if (dataReadY < thresholdRotation) {
-        Util::debug_print("Rotation occurred around X axis!");
+        Util::debug_print(F("Rotation occurred around X axis!"));
         rotation_occurred = 1;
       }
 
       if (dataReadX > thresholdXaxis || dataReadY > thresholdYaxis || dataReadZ > thresholdZaxis) {
-        Util::debug_print("Above threshold event occurred!");
+        Util::debug_print(F("Above threshold event occurred!"));
       }
 
       // battery level
       battery_level = getBatteryLevel(Util::readVcc());
-      Util::debug_print("BatteryLevel = ", battery_level, true);
 
       // get message of maximum 12 bytes
       String hexString = getSigFoxMessage(seq_num, rotation_occurred, xXmax, yYmax, zZmax, battery_level, thresholdXaxis, thresholdYaxis, thresholdZaxis, shockEventLastPeriod, thresholdRotation, (shockEventLastPeriod > 254) ? 2 : 1);
@@ -274,7 +272,6 @@ void loop() {
 
     // battery level
     battery_level = getBatteryLevel(Util::readVcc());
-    Util::debug_print("Message Sigfox - BatteryLevel: ", battery_level, true);
 
     // thresholds
     Util::debug_print("Message Sigfox - Threshold X axis: " + String(thresholdXaxis));
@@ -307,7 +304,7 @@ void loop() {
         String downlink_message = SigFox::recv_from_sigfox();
         Util::debug_print("Received message: " + downlink_message);
         Util::debug_print("Downlink: " + downlink_message.substring(7, 18));
-        char string_hex[9];
+        char string_hex[12];
         downlink_message.substring(7, 18).toCharArray(string_hex, 12);
         uint8_t downlinkThresholdXaxis;
         uint8_t downlinkThresholdYaxis;
