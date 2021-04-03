@@ -34,7 +34,7 @@ uint8_t thresholdYaxis = 255;
 uint8_t thresholdZaxis = 255; //0...255
 uint8_t thresholdRotation = 63; // 127/2 ~ 45 degrees
 uint8_t shockPin = 0;
-uint8_t shockEventLasthour = 0;
+uint8_t shockEventLastPeriod = 0;
 uint8_t rotation_occurred = 0;
 uint8_t battery_level = 0;
 
@@ -126,10 +126,11 @@ uint8_t getBatteryLevel(uint16_t ba)
 }
 
 String getSigFoxMessage(uint8_t sequence, uint8_t rotation_occurred, uint8_t accel_x, uint8_t accel_y, uint8_t accel_z, uint8_t battery_level,
-                        uint8_t thresholdXaxis, uint8_t thresholdYaxis, uint8_t thresholdZaxis, uint8_t shockEventLasthour, uint8_t thresholdRotation, uint8_t messageType) {
+                        uint8_t thresholdXaxis, uint8_t thresholdYaxis, uint8_t thresholdZaxis, uint8_t shockEventLastPeriod, uint8_t thresholdRotation, uint8_t messageType) {
   // Sigfox message of maximum 12 bytes
   // message type = 0 - keep-alive
   // message type = 1 - accel-event
+  // message type = 2 - max-shock-events
   String hexString = stringHEX(sequence, 2); // sequence -- 1 byte (2 hex chars)
   hexString += stringHEX(rotation_occurred, 2); // rotation_occurred -- 1 byte (2 hex chars)
   hexString += stringHEX(accel_x, 2); // accel_x -- 1 byte (2 hex chars)
@@ -139,7 +140,7 @@ String getSigFoxMessage(uint8_t sequence, uint8_t rotation_occurred, uint8_t acc
   hexString += stringHEX(thresholdXaxis, 2); // thresholdXaxis -- 1 byte (2 hex chars)
   hexString += stringHEX(thresholdYaxis, 2); // thresholdYaxis -- 1 byte (2 hex chars)
   hexString += stringHEX(thresholdZaxis, 2); // thresholdZaxis -- 1 byte (2 hex chars)
-  hexString += stringHEX(shockEventLasthour, 2); // shockEventLasthour -- 1 byte (2 hex chars)
+  hexString += stringHEX(shockEventLastPeriod, 2); // shockEventLastPeriod -- 1 byte (2 hex chars)
   hexString += stringHEX(thresholdRotation, 2); // thresholdRotation -- 1 byte (2 hex chars)
   hexString += stringHEX(messageType, 2); // messageType -- 1 byte (2 hex chars)
   return hexString;
@@ -160,8 +161,8 @@ void loop() {
 
   if (shockPin == 1)
   {
-    shockEventLasthour++;
-    Util::debug_print("\nShock events last SigFox wait period: " + String(shockEventLasthour));
+    shockEventLastPeriod++;
+    Util::debug_print("\nShock events last SigFox wait period: " + String(shockEventLastPeriod));
     Util::debug_print(F("Wake up after INT. Accel:"));
     uint8_t dataReadX;
     uint8_t dataReadY;
@@ -197,7 +198,7 @@ void loop() {
     shockPin = 0;
     num_readings++;
 
-    if (dataReadX > thresholdXaxis || dataReadY > thresholdYaxis || dataReadZ > thresholdZaxis || dataReadY < thresholdRotation) {
+    if (dataReadX > thresholdXaxis || dataReadY > thresholdYaxis || dataReadZ > thresholdZaxis || dataReadY < thresholdRotation || shockEventLastPeriod > 254) {
       Util::debug_print(F("Set sigfox wake up to send event message..."));
       SigFox::set_sigfox_sleep(false);
 
@@ -212,7 +213,7 @@ void loop() {
       }
 
       // get message of maximum 12 bytes
-      String hexString = getSigFoxMessage(seq_num, rotation_occurred, xXmax, yYmax, zZmax, battery_level, thresholdXaxis, thresholdYaxis, thresholdZaxis, shockEventLasthour, thresholdRotation, 1);
+      String hexString = getSigFoxMessage(seq_num, rotation_occurred, xXmax, yYmax, zZmax, battery_level, thresholdXaxis, thresholdYaxis, thresholdZaxis, shockEventLastPeriod, thresholdRotation, (shockEventLastPeriod > 254) ? 2 : 1);
 
       String msg_header = "Sigfox message (HEX): ";
       Util::debug_print(msg_header + hexString);
@@ -241,7 +242,7 @@ void loop() {
       yYmax = 0;
       zZmax = 0;
       rotation_occurred = 0;
-      shockEventLasthour = 0;
+      shockEventLastPeriod = 0;
       num_readings = 0;
       period_count = 0;
     }
@@ -274,8 +275,11 @@ void loop() {
     // battery level
     battery_level = getBatteryLevel(Util::readVcc());
 
+    // shock events during last SigFox wait period
+    Util::debug_print("Shock events last SigFox wait period: " + String(shockEventLastPeriod));
+
     // get message of maximum 12 bytes
-    String hexString = getSigFoxMessage(seq_num, rotation_occurred, xXmax, yYmax, zZmax, battery_level, thresholdXaxis, thresholdYaxis, thresholdZaxis, shockEventLasthour, thresholdRotation, 0);
+    String hexString = getSigFoxMessage(seq_num, rotation_occurred, xXmax, yYmax, zZmax, battery_level, thresholdXaxis, thresholdYaxis, thresholdZaxis, shockEventLastPeriod, thresholdRotation, 0);
 
     String msg_header = "Sigfox message (HEX): ";
     Util::debug_print(msg_header + hexString);
@@ -327,7 +331,7 @@ void loop() {
     yYmax = 0;
     zZmax = 0;
     rotation_occurred = 0;
-    shockEventLasthour = 0;
+    shockEventLastPeriod = 0;
     num_readings = 0;
     period_count = 0;
     seq_num++;
